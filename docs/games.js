@@ -1,10 +1,10 @@
-import {drawTogetherGuide} from './care.js?v=practice-v1';
-import {drawCompanion} from './companions.js?v=practice-v1';
-import {LEVELS} from './data.js?v=practice-v1';
-import {createStory} from './stories.js?v=practice-v1';
-import {STORY_JOKES} from './story-jokes.js?v=practice-v1';
-import {LETTER_SHAPES} from './letter-shapes.js?v=practice-v1';
-import {C,line,circle,text,box,sprite,glyph,check,clamp} from './drawing.js?v=practice-v1';
+import {drawTogetherGuide} from './care.js?v=practice-v2';
+import {drawCompanion} from './companions.js?v=practice-v2';
+import {LEVELS} from './data.js?v=practice-v2';
+import {createStory} from './stories.js?v=practice-v2';
+import {STORY_JOKES} from './story-jokes.js?v=practice-v2';
+import {LETTER_SHAPES} from './letter-shapes.js?v=practice-v2';
+import {C,line,circle,text,box,sprite,glyph,check,clamp} from './drawing.js?v=practice-v2';
 
 // Every reward requires both changing the letter's actual geometry and finding
 // that letter twice. The story changes the tool; the printed form is the goal.

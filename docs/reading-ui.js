@@ -1,7 +1,7 @@
-import {LEVELS} from './data.js?v=practice-v1';
-import {art} from './art.js?v=practice-v1';
-import {companionFor} from './companions.js?v=practice-v1';
-import {createRecognition} from './recognition.js?v=practice-v1';
+import {LEVELS} from './data.js?v=practice-v2';
+import {art} from './art.js?v=practice-v2';
+import {companionFor} from './companions.js?v=practice-v2';
+import {createRecognition} from './recognition.js?v=practice-v2';
 
 const choices=[1,2,0,1,0,0,1,1,1,0,1,1,2,1,2,2,2,1,1,0,0,0,2,2,2,2,2,0,0,0,0,0,1];
 const syllables=['ар-буз','буб-лик','во-да','гриб','дом','е-да','ёл-ка','жук','зонт','и-ко-та','чай','ка-нат','лес','ма-ма','нос','об-руч','паль-чик','ры-ба','слон','торт','у-сы','фи-лин','хлеб','цве-ток','чай','шу-ба','ще-нок','съел','сыр','конь','э-хо','ю-ла','я-ма'];
@@ -19,7 +19,7 @@ export function createReading({container,modal,getSettings,save,play,stop,unlock
   if(['retry','denied','unavailable','no-microphone'].includes(state))play('reading-retry');
  },onMatch:()=>award()});
  function current(){return deck[at]}
- function updateStatus(){const el=container.querySelector('#reading-status');if(el)el.textContent=status;const b=container.querySelector('[data-read="mic"]');if(b){b.disabled=recognizer.active;b.classList.toggle('listening',recognizer.active);b.textContent=recognizer.active?'● Слушаю…':'🎙 Скажи слово'}}
+ function updateStatus(){const el=container.querySelector('#reading-status');if(el)el.textContent=status;const b=container.querySelector('[data-read="mic"]');if(b){b.disabled=false;b.classList.toggle('listening',recognizer.active);b.textContent=recognizer.active?'■ Остановить':'🎙 Скажи слово'}}
  function cancel(){recognizer.cancel();if(opened){status='';updateStatus()}}
  function destroy(){cancel();opened=false;deck=[];finishing=false}
  function open(index=0){
@@ -31,7 +31,7 @@ export function createReading({container,modal,getSettings,save,play,stop,unlock
  }
  function render(){
   if(!opened)return;const item=current(),f=companionFor(item.index,at),settings=getSettings();
-  container.innerHTML=`<main class="reading-page"><header class="reading-header"><button class="icon" data-action="home" aria-label="Ко всем буквам">⌂</button><strong>Слова оживают</strong><button class="secondary" data-action="parents">Взрослым</button></header><p class="kicker">${at+1} / ${deck.length} · МАЛЕНЬКИЙ ГОЛОСОВОЙ ТЕАТР</p><section class="reading-card ${earned?'word-awarded':''}"><div class="reading-friend">${art(f.kind,f.colour)}<span>${f.name}</span></div><div class="reading-task"><h1>${earned?'Слово ожило!':'Прочитай слово вслух'}</h1><p class="reading-word" aria-label="Слово ${escapeHTML(item.word)}">${escapeHTML(item.word.toUpperCase())}</p>${hint?`<p class="reading-syllables">${escapeHTML(item.syllables.toUpperCase().replace(/-/g,' · '))}</p>`:''}<p>${earned?escapeHTML(f.line):'Если пока трудно — послушай и повтори. Можно вместе.'}</p><div class="reading-tools"><button class="secondary" data-read="listen">◖)) Послушать</button><button class="secondary" data-read="syllables">По слогам</button></div>${earned?`<div class="word-prize" aria-label="Получена звёздочка">✦ ${'✦ '.repeat(at)}</div><button class="primary" data-read="next">${at+1===deck.length?'Наш праздник':'Ещё слово'} ↗</button>`:settings.recognition==='browser'&&Recognition?'<button class="primary mic-button" data-read="mic">🎙 Скажи слово</button>':`<p class="reading-adult-note">${settings.recognition==='browser'?'Этот браузер не умеет распознавать речь.':'Сейчас слушает взрослый. Микрофон выключен.'}</p>`}<p id="reading-status" class="reading-status" role="status" aria-live="polite">${escapeHTML(status)}</p>${earned?'':'<button class="reading-adult" data-read="adult">Взрослый послушает ↗</button>'}</div></section><div class="reading-stars" aria-label="${at+(earned?1:0)} из ${deck.length} слов">${deck.map((v,i)=>`<span class="${i<at||i===at&&earned?'lit':''}">✦</span>`).join('')}</div><p class="reading-privacy">Голос распознаёт сервис браузера (в Safari — Apple). Микрофон включается только кнопкой. Можно закончить в любой момент.</p></main>`;
+  container.innerHTML=`<main class="reading-page"><header class="reading-header"><button class="icon" data-action="home" aria-label="Ко всем буквам">⌂</button><strong>Слова оживают</strong><button class="secondary" data-action="parents">Взрослым</button></header><p class="kicker">${at+1} / ${deck.length} · МАЛЕНЬКИЙ ГОЛОСОВОЙ ТЕАТР</p><section class="reading-card ${earned?'word-awarded':''}"><div class="reading-friend">${art(f.kind,f.colour)}<span>${f.name}</span></div><div class="reading-task"><h1>${earned?'Слово ожило!':'Прочитай слово вслух'}</h1><p class="reading-word" aria-label="Слово ${escapeHTML(item.word)}">${escapeHTML(item.word.toUpperCase())}</p>${hint?`<p class="reading-syllables">${escapeHTML(item.syllables.toUpperCase().replace(/-/g,' · '))}</p>`:''}<p>${earned?escapeHTML(f.line):'Если пока трудно — послушай и повтори. Можно вместе.'}</p><div class="reading-tools"><button class="secondary" data-read="listen">◖)) Послушать</button><button class="secondary" data-read="syllables">По слогам</button></div>${earned?`<div class="word-prize" aria-label="Получена звёздочка">✦ ${'✦ '.repeat(at)}</div><button class="primary" data-read="next">${at+1===deck.length?'Наш праздник':'Ещё слово'} ↗</button>`:settings.recognition==='browser'&&Recognition?'<button class="primary mic-button" data-read="mic">🎙 Скажи слово</button>':`<p class="reading-adult-note">${settings.recognition==='browser'?'Этот браузер не умеет распознавать речь.':'Сейчас слушает взрослый. Микрофон выключен.'}</p>`}<p id="reading-status" class="reading-status" role="status" aria-live="polite">${escapeHTML(status)}</p>${earned?'':'<button class="reading-adult" data-read="adult">Взрослый послушает ↗</button>'}</div></section><div class="reading-stars" aria-label="${at+(earned?1:0)} из ${deck.length} слов">${deck.map((v,i)=>`<span class="${i<at||i===at&&earned?'lit':''}">✦</span>`).join('')}</div><p class="reading-privacy">Твои звёзды: ${getSettings().readingStars||0} ✦</p><p class="reading-privacy">Голос распознаёт сервис браузера (в Safari — Apple). Микрофон включается только кнопкой. Можно закончить в любой момент.</p></main>`;
  }
  function award(){
   if(!opened||earned||finishing)return;recognizer.cancel();stop();earned=true;status='';
@@ -43,7 +43,7 @@ export function createReading({container,modal,getSettings,save,play,stop,unlock
  }
  function finish(){finishing=true;recognizer.cancel();const f=companionFor(0,at);container.innerHTML=`<main class="reading-finish"><div class="reading-finish-art">${art(f.kind,f.colour)}</div><p class="kicker">НАШ МАЛЕНЬКИЙ ПРАЗДНИК</p><h1>${deck.length} слов ожили!</h1><p>Ты подарил героям свой голос.<br>Спасибо, что играл с нами.</p><div class="word-prize">${'✦ '.repeat(deck.length)}</div><div class="modal-actions"><button class="primary" data-read="restart">Ещё слова ↗</button><button class="secondary" data-action="home">К нашим буквам</button></div></main>`;celebrate();play('reading-finish')}
  function handle(action){if(!opened)return;unlock();switch(action){
-  case'mic':if(getSettings().recognition==='browser'&&!earned&&!finishing){stop();recognizer.start(current().word)}break;
+  case'mic':if(recognizer.active){cancel();status='Микрофон выключен';updateStatus()}else if(getSettings().recognition==='browser'&&!earned&&!finishing){stop();recognizer.start(current().word)}break;
   case'listen':cancel();play(current().clip);break;
   case'syllables':cancel();hint=!hint;render();play(current().clip);break;
   case'adult':if(!earned&&!finishing)adult();break;

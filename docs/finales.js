@@ -1,4 +1,4 @@
-import {C,sprite,glyph,text,line,circle,box,bubble} from './drawing.js?v=practice-v1';
+import {C,sprite,glyph,text,line,circle,box,bubble} from './drawing.js?v=practice-v2';
 export function drawFinale(i,c,t,data={}){
  c.fillStyle='#f9f3e5';c.fillRect(0,0,600,230);const b=Math.sin(t*3)*8,r=Math.sin(t*2)*.12;
  const s=(k,x,y,w=120,h=w,v=0,a=0,col=C.purple)=>sprite(c,k,x,y,w,h,v,a,col);

@@ -1,4 +1,4 @@
-import {C,sprite,text,circle,box} from './drawing.js?v=practice-v1';
+import {C,sprite,text,circle,box} from './drawing.js?v=practice-v2';
 
 export const COMPANIONS=Object.freeze([
  {kind:'fox',name:'Лис Ложкин',line:'Шляпу съел? Нет, надел!',colour:C.coral},

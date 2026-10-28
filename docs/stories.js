@@ -1,5 +1,5 @@
-import {blanket} from './care.js?v=practice-v1';
-import {C,sprite,glyph,text,line,circle,box,bubble,clamp} from './drawing.js?v=practice-v1';
+import {blanket} from './care.js?v=practice-v2';
+import {C,sprite,glyph,text,line,circle,box,bubble,clamp} from './drawing.js?v=practice-v2';
 
 // The letter is a prop in a small comic scene. Reactions follow touches and
 // successful construction; the story never awards learning progress itself.

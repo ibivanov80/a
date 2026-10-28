@@ -1,6 +1,6 @@
-import {createGame,GAME_COUNT} from './games.js?v=practice-v1';
-import {LEVELS} from './data.js?v=practice-v1';
-import {drawPracticeBreak} from './companions.js?v=practice-v1';
+import {createGame,GAME_COUNT} from './games.js?v=practice-v2';
+import {LEVELS} from './data.js?v=practice-v2';
+import {drawPracticeBreak} from './companions.js?v=practice-v2';
 export {GAME_COUNT};
 
 export function practiceSettings(settings={}){

@@ -1,4 +1,4 @@
-import {C,sprite,line,circle,box,text} from './drawing.js?v=practice-v1';
+import {C,sprite,line,circle,box,text} from './drawing.js?v=practice-v2';
 
 export function blanket(c,x,y,w,h,colour=C.blue){
  box(c,x,y,w,h,Math.min(18,h/3),colour);

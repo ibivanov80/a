@@ -1,4 +1,4 @@
-import {art} from './art.js?v=practice-v2';
+import {art} from './art.js?v=variety-v1';
 export const W=1000,H=560;
 export const C={ink:'#34313c',paper:'#faf6eb',purple:'#a99be8',coral:'#ee845e',green:'#a9c678',yellow:'#eac666',blue:'#8abac2',pink:'#d99eae'};
 export const PALETTES=[['#f6dfcd','#c9764f'],['#e6def3','#8c73bd'],['#e4eccf','#7d9856'],['#f3e6b7','#b19846'],['#dcebed','#648f97'],['#f1dee4','#b87a90']];

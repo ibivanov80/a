@@ -11,9 +11,10 @@ manifest=json.loads((ROOT/'audio-manifest.json').read_text())
 comedy=json.loads((ROOT/'comedy-narration-plan.json').read_text())
 warmth=json.loads((ROOT/'warmth-narration-plan.json').read_text())
 practice=json.loads((ROOT/'practice-narration-plan.json').read_text())
-expected={r['file']:r for r in plan['files']+comedy['files']+warmth['files']+practice['files']}
+variety=json.loads((ROOT/'variety-narration-plan.json').read_text())
+expected={r['file']:r for r in plan['files']+comedy['files']+warmth['files']+practice['files']+variety['files']}
 actual={r['file']:r for r in manifest['files']}
-assert len(actual)==manifest['count']==346 and actual.keys()==expected.keys()
+assert len(actual)==manifest['count']==357 and actual.keys()==expected.keys()
 assert manifest['provider']=='ElevenLabs' and manifest['voice_id']==plan['voice_id']=='0BcDz9UPwL3MpsnTeUlO'
 assert manifest.get('model',manifest.get('model_id'))=='eleven_v4'
 assert {p.name for p in (ROOT/'docs/audio').glob('*.m4a')}==expected.keys(),'Unexpected or missing published recordings'

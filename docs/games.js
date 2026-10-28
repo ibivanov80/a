@@ -1,10 +1,10 @@
-import {drawTogetherGuide} from './care.js?v=practice-v2';
-import {drawCompanion} from './companions.js?v=practice-v2';
-import {LEVELS} from './data.js?v=practice-v2';
-import {createStory} from './stories.js?v=practice-v2';
-import {STORY_JOKES} from './story-jokes.js?v=practice-v2';
-import {LETTER_SHAPES} from './letter-shapes.js?v=practice-v2';
-import {C,line,circle,text,box,sprite,glyph,check,clamp} from './drawing.js?v=practice-v2';
+import {drawTogetherGuide} from './care.js?v=variety-v1';
+import {drawCompanion} from './companions.js?v=variety-v1';
+import {LEVELS} from './data.js?v=variety-v1';
+import {createStory} from './stories.js?v=variety-v1';
+import {STORY_JOKES} from './story-jokes.js?v=variety-v1';
+import {LETTER_SHAPES} from './letter-shapes.js?v=variety-v1';
+import {C,line,circle,text,box,sprite,glyph,check,clamp} from './drawing.js?v=variety-v1';
 
 // Every reward requires both changing the letter's actual geometry and finding
 // that letter twice. The story changes the tool; the printed form is the goal.
@@ -23,7 +23,7 @@ function sameShape(a,b){const ca=centre(a),cb=centre(b),aa=sample(a,10).map(p=>[
 function drawPart(c,p,colour=C.purple,width=23){line(c,p.points,colour,width)}
 
 export function createGame(index,api,options={}){
- const l=LEVELS[index],shape=LETTER_SHAPES[index];
+ const l={...LEVELS[index],...options.lesson},shape=LETTER_SHAPES[index];
  const findGoal=[2,5,10,20].includes(options.finds)?options.finds:2;
  const parts=shape.parts.map((p,i)=>({...p,points:p.points.map(XY),colour:colours[(i+index+(options.variant||0))%colours.length]}));
  const fixed=new Set(l.fixed),done=new Set(l.fixed);
@@ -31,7 +31,7 @@ export function createGame(index,api,options={}){
  let phase='build',active=false,pointer=[0,0],previous=null,drag=null,selected=null,reveal=0,round=0,cards=[],wrong=-1,wrongTime=0,findLock=0,mirrored=false;
  let strokeParts=parts.filter(p=>!fixed.has(p.id));
  let trace=new Map(),covered=new Map(),rotations=[],pieces=[],stamp=[],erased=0,extension=0,rollX=490,rollTouch=false,rollFill=[0,0,0],pump=new Map(),mirrorReady=false;
- const mode=l.mode,story=createStory(index,api),joke=STORY_JOKES[index];
+ const mode=l.mode,story=options.story||createStory(index,api),joke=options.joke||STORY_JOKES[index];
  if(mode==='rays'){
    strokeParts=parts.flatMap(p=>{const points=p.points;const mid=[490,240];return [points[0],points.at(-1)].map((end,j)=>({id:p.id+'-'+j,label:'Лучик',points:[mid,end],colour:p.colour}))});
  }
@@ -62,7 +62,7 @@ export function createGame(index,api,options={}){
  const total=()=>mode==='stamp'?stamp.length:mode==='rays'?6:mode==='erase'||mode==='extend'?1:parts.length;
  const progress=()=>{let n=done.size;if(mode==='stamp')n=stamp.filter(p=>p.done).length;if(mode==='rays')n=strokeParts.filter(p=>done.has(p.id)).length;if(mode==='erase')n=erased>=1?1:0;if(mode==='extend')n=extension>=1?1:0;api.step?.(n,total(),'Собираем')};
  progress();
- function complete(){if(phase!=='build')return;phase='reveal';active=false;drag=null;selected=null;reveal=0;story.react();api.effect?.('pop');api.instruction?.(joke.text,index+'-joke',index+'-joke');api.step?.(1,1,'Буква ожила')}
+ function complete(){if(phase!=='build')return;phase='reveal';active=false;drag=null;selected=null;reveal=0;story.react();api.effect?.('pop');api.instruction?.(joke.text,joke.clip||index+'-joke',joke.clip||index+'-joke');api.step?.(1,1,'Буква ожила')}
  function checkComplete(){if(parts.every(p=>done.has(p.id)))complete()}
  function mark(p){if(done.has(p.id))return;done.add(p.id);story.react();api.effect?.(mode==='strings'?'wing':'pop');if(mode==='strings')api.note?.(260+done.size*110,.25);progress();if(mode==='rays'){if(strokeParts.every(p=>done.has(p.id)))complete()}else checkComplete()}
  function nextTrace(){return strokeParts.find(p=>!done.has(p.id))}
@@ -76,7 +76,7 @@ export function createGame(index,api,options={}){
    trace.set(selected.id,n);
    if(n>=s.length){const part=selected;selected=null;mark(part)}
  }
- function traceMove(p){if(previous&&distance(previous,p)<110){const n=Math.ceil(distance(previous,p)/9);for(let k=1;k<=n;k++)traceAt(mix(previous,p,k/n))}else traceAt(p);previous=p}
+ function traceMove(p){if(previous&&distance(previous,p)<110){const n=Math.max(1,Math.ceil(distance(previous,p)/9));for(let k=1;k<=n;k++)traceAt(mix(previous,p,k/n))}else traceAt(p);previous=p}
  function deck(){const pool=round<2?l.distractors:shuffle([...new Set([...l.distractors,...LEVELS.map(v=>v.letter).filter(v=>v!==l.letter)])]).slice(0,2);let a=shuffle([l.letter,...pool]);if(cards.length&&a.indexOf(l.letter)===cards.findIndex(c=>c.letter===l.letter)){const j=a.indexOf(l.letter),k=(j+1)%a.length;[a[j],a[k]]=[a[k],a[j]]}cards=a.map((letter,i)=>({letter,x:170+i*230,y:185,w:200,h:225}));wrong=-1}
  function startFind(){phase='find';deck();api.instruction?.(l.findDisplay||l.find,index+'-find',index+'-find-hint');api.step?.(0,findGoal,'Узнаём')}
  function found(p){if(findLock>0)return;const j=cards.findIndex(c=>p[0]>=c.x&&p[0]<=c.x+c.w&&p[1]>=c.y&&p[1]<=c.y+c.h);if(j<0)return;if(cards[j].letter!==l.letter){if(wrongTime===0){misses++;api.clip?.(misses===1?'try-together':index+'-find-hint')}wrong=j;wrongTime=2.8;api.effect?.('gentle');return}wrongTime=0;round++;api.effect?.('pop');api.step?.(round,findGoal,'Узнаём');if(round===findGoal){phase='done';api.finish?.()}else{deck();findLock=.55;api.instruction?.('Точно! А теперь найди эту букву ещё раз. Она поменялась местами!',round%5===0?'practice-cheer':'practice-find-again',index+'-find-hint')}}
@@ -177,5 +177,5 @@ export function createGame(index,api,options={}){
    if(phase==='find'||phase==='done'){text(c,round===0?'Где наша буква?':'А теперь — ещё раз!',500,65,30,C.ink);box(c,73,105,100,92,22,'#fffaf2');glyph(c,l.letter,123,158,72,C.ink);for(let j=0;j<cards.length;j++){const card=cards[j],shake=0;box(c,card.x+shake,card.y,card.w,card.h,28,'#fffaf2',wrong===j&&wrongTime>0?'#e0b78e':'#d6cbb6');glyph(c,card.letter,card.x+card.w/2+shake,card.y+card.h*.56,160,round>1?['#b66343','#8064aa','#657f42','#517f89','#9d5f7b','#8c732d'][(round+j)%6]:C.ink)}if(options.companion)drawCompanion(c,index,t,{round:Math.floor(round/5),happy:findLock>0});else drawTogetherGuide(c,t,wrongTime>0);const spacing=Math.min(42,620/findGoal);for(let j=0;j<findGoal;j++){const x=500+(j-(findGoal-1)/2)*spacing;circle(c,x,475,findGoal>10?10:14,j<round?C.green:'#d8cfbd');if(j<round)text(c,'✓',x,475,findGoal>10?14:18,'#fffaf0')}if(wrongTime>0)text(c,'Давай посмотрим вместе',500,527,20,'#8c7862');}
  }
  function cancel(){active=false;previous=null;selected=null;if(drag?.position)drag.position=null;drag=null}
- return{down,move,up,cancel,draw,guide,replay(){if(phase==='reveal')reveal=0},state:()=>({phase,round,placed:[...done],progress:tracePoints.size?[...trace].map(([id,n])=>({id,n,total:tracePoints.get(id)?.length||0})):[],cards:cards.map(c=>({...c})),parts:parts.map(p=>({id:p.id,points:p.points.map(q=>q.slice())})),pieces:pieces.map(p=>({id:p.id,decoy:p.decoy,used:p.used,home:p.home,origin:p.origin,dy:p.dy})),mirrorReady,extension,erased})};
+ return{down,move,up,cancel,draw,guide,replay(){if(phase==='reveal')reveal=0},state:()=>({phase,round,mode,placed:[...done],progress:tracePoints.size?[...trace].map(([id,n])=>({id,n,total:tracePoints.get(id)?.length||0})):[],cards:cards.map(c=>({...c})),parts:parts.map(p=>({id:p.id,points:p.points.map(q=>q.slice())})),pieces:pieces.map(p=>({id:p.id,decoy:p.decoy,used:p.used,home:p.home,origin:p.origin,dy:p.dy})),mirrorReady,extension,erased})};
 }

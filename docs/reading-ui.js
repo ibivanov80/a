@@ -1,7 +1,7 @@
-import {LEVELS} from './data.js?v=practice-v2';
-import {art} from './art.js?v=practice-v2';
-import {companionFor} from './companions.js?v=practice-v2';
-import {createRecognition} from './recognition.js?v=practice-v2';
+import {LEVELS} from './data.js?v=variety-v1';
+import {art} from './art.js?v=variety-v1';
+import {companionFor} from './companions.js?v=variety-v1';
+import {createRecognition} from './recognition.js?v=variety-v1';
 
 const choices=[1,2,0,1,0,0,1,1,1,0,1,1,2,1,2,2,2,1,1,0,0,0,2,2,2,2,2,0,0,0,0,0,1];
 const syllables=['ар-буз','буб-лик','во-да','гриб','дом','е-да','ёл-ка','жук','зонт','и-ко-та','чай','ка-нат','лес','ма-ма','нос','об-руч','паль-чик','ры-ба','слон','торт','у-сы','фи-лин','хлеб','цве-ток','чай','шу-ба','ще-нок','съел','сыр','конь','э-хо','ю-ла','я-ма'];

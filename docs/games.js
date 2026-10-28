@@ -1,9 +1,10 @@
-import {drawTogetherGuide} from './care.js?v=letter-learning-v5';
-import {LEVELS} from './data.js?v=letter-learning-v5';
-import {createStory} from './stories.js?v=letter-learning-v5';
-import {STORY_JOKES} from './story-jokes.js?v=letter-learning-v5';
-import {LETTER_SHAPES} from './letter-shapes.js?v=letter-learning-v5';
-import {C,line,circle,text,box,sprite,glyph,check,clamp} from './drawing.js';
+import {drawTogetherGuide} from './care.js?v=practice-v1';
+import {drawCompanion} from './companions.js?v=practice-v1';
+import {LEVELS} from './data.js?v=practice-v1';
+import {createStory} from './stories.js?v=practice-v1';
+import {STORY_JOKES} from './story-jokes.js?v=practice-v1';
+import {LETTER_SHAPES} from './letter-shapes.js?v=practice-v1';
+import {C,line,circle,text,box,sprite,glyph,check,clamp} from './drawing.js?v=practice-v1';
 
 // Every reward requires both changing the letter's actual geometry and finding
 // that letter twice. The story changes the tool; the printed form is the goal.
@@ -21,9 +22,10 @@ const rotate=(p,o,a)=>[o[0]+(p[0]-o[0])*Math.cos(a)-(p[1]-o[1])*Math.sin(a),o[1]
 function sameShape(a,b){const ca=centre(a),cb=centre(b),aa=sample(a,10).map(p=>[p[0]-ca[0],p[1]-ca[1]]),bb=sample(b,10).map(p=>[p[0]-cb[0],p[1]-cb[1]]);if(Math.abs(aa.length-bb.length)>2)return false;const error=rev=>aa.reduce((s,p,i)=>s+distance(p,bb[Math.round(i/(aa.length-1)*(bb.length-1))*(rev?-1:1)+(rev?bb.length-1:0)]),0)/aa.length;return Math.min(error(false),error(true))<9}
 function drawPart(c,p,colour=C.purple,width=23){line(c,p.points,colour,width)}
 
-export function createGame(index,api){
+export function createGame(index,api,options={}){
  const l=LEVELS[index],shape=LETTER_SHAPES[index];
- const parts=shape.parts.map((p,i)=>({...p,points:p.points.map(XY),colour:colours[(i+index)%colours.length]}));
+ const findGoal=[2,5,10,20].includes(options.finds)?options.finds:2;
+ const parts=shape.parts.map((p,i)=>({...p,points:p.points.map(XY),colour:colours[(i+index+(options.variant||0))%colours.length]}));
  const fixed=new Set(l.fixed),done=new Set(l.fixed);
  let misses=0;
  let phase='build',active=false,pointer=[0,0],previous=null,drag=null,selected=null,reveal=0,round=0,cards=[],wrong=-1,wrongTime=0,findLock=0,mirrored=false;
@@ -75,9 +77,9 @@ export function createGame(index,api){
    if(n>=s.length){const part=selected;selected=null;mark(part)}
  }
  function traceMove(p){if(previous&&distance(previous,p)<110){const n=Math.ceil(distance(previous,p)/9);for(let k=1;k<=n;k++)traceAt(mix(previous,p,k/n))}else traceAt(p);previous=p}
- function deck(){let a=shuffle([l.letter,...l.distractors]);if(cards.length&&a.indexOf(l.letter)===cards.findIndex(c=>c.letter===l.letter)){const j=a.indexOf(l.letter),k=(j+1)%a.length;[a[j],a[k]]=[a[k],a[j]]}cards=a.map((letter,i)=>({letter,x:170+i*230,y:185,w:200,h:225}));wrong=-1}
- function startFind(){phase='find';deck();api.instruction?.(l.findDisplay||l.find,index+'-find',index+'-find-hint');api.step?.(0,2,'Узнаём')}
- function found(p){if(findLock>0)return;const j=cards.findIndex(c=>p[0]>=c.x&&p[0]<=c.x+c.w&&p[1]>=c.y&&p[1]<=c.y+c.h);if(j<0)return;if(cards[j].letter!==l.letter){if(wrongTime===0){misses++;api.clip?.(misses===1?'try-together':index+'-find-hint')}wrong=j;wrongTime=2.8;api.effect?.('gentle');return}wrongTime=0;round++;api.effect?.('pop');api.step?.(round,2,'Узнаём');if(round===2){phase='done';api.finish?.()}else{deck();findLock=.55;api.instruction?.('Точно! А теперь найди эту букву ещё раз. Она поменялась местами!','find-again',index+'-find-hint')}}
+ function deck(){const pool=round<2?l.distractors:shuffle([...new Set([...l.distractors,...LEVELS.map(v=>v.letter).filter(v=>v!==l.letter)])]).slice(0,2);let a=shuffle([l.letter,...pool]);if(cards.length&&a.indexOf(l.letter)===cards.findIndex(c=>c.letter===l.letter)){const j=a.indexOf(l.letter),k=(j+1)%a.length;[a[j],a[k]]=[a[k],a[j]]}cards=a.map((letter,i)=>({letter,x:170+i*230,y:185,w:200,h:225}));wrong=-1}
+ function startFind(){phase='find';deck();api.instruction?.(l.findDisplay||l.find,index+'-find',index+'-find-hint');api.step?.(0,findGoal,'Узнаём')}
+ function found(p){if(findLock>0)return;const j=cards.findIndex(c=>p[0]>=c.x&&p[0]<=c.x+c.w&&p[1]>=c.y&&p[1]<=c.y+c.h);if(j<0)return;if(cards[j].letter!==l.letter){if(wrongTime===0){misses++;api.clip?.(misses===1?'try-together':index+'-find-hint')}wrong=j;wrongTime=2.8;api.effect?.('gentle');return}wrongTime=0;round++;api.effect?.('pop');api.step?.(round,findGoal,'Узнаём');if(round===findGoal){phase='done';api.finish?.()}else{deck();findLock=.55;api.instruction?.('Точно! А теперь найди эту букву ещё раз. Она поменялась местами!',round%5===0?'practice-cheer':'practice-find-again',index+'-find-hint')}}
  function buildDown(p){
    if(builder){const piece=pieces.find(s=>!s.used&&Math.abs(p[0]-s.home[0])<61&&Math.abs(p[1]-s.home[1])<47);if(piece){drag=piece;piece.position=p}return}
    if(mode==='lift'||mode==='slide'){const piece=pieces.find(s=>!s.used&&distance(p,[s.origin[0],s.origin[1]+s.dy])<100);if(piece){drag=piece;drag.offset=p[1]-piece.dy}return}
@@ -127,7 +129,7 @@ export function createGame(index,api){
    return null;
  }
  function update(dt){wrongTime=Math.max(0,wrongTime-dt);findLock=Math.max(0,findLock-dt);
-   if(phase==='reveal'){reveal+=dt;if(reveal>joke.duration+.3&&(!api.speaking?.()||reveal>joke.duration+10))startFind();return}
+   if(phase==='reveal'){reveal+=dt;if(reveal>joke.duration+.3&&(!api.speaking?.()||reveal>joke.duration+10)){if(api.beforeFind?.())phase='between';else startFind()}return}
    if(phase!=='build')return;
    if(mode==='pump'&&active){for(const s of strokeParts){if(done.has(s.id))continue;if(distance(pointer,centre(s.points))<69){const v=Math.min(1,(pump.get(s.id)||0)+dt/1.05);pump.set(s.id,v);if(v===1)mark(s)}}}
    if(mode==='roll'&&active&&rollTouch&&rollFill.some(n=>n<1)){for(let j=0;j<3;j++){const x=XY([5+j*45,0])[0];if(Math.abs(rollX-x)<32){rollFill[j]=Math.min(1,rollFill[j]+dt/.65);if(rollFill[j]===1&&!done.has(parts[j].id))mark(parts[j])}}}
@@ -172,7 +174,7 @@ export function createGame(index,api){
    if(phase==='reveal'){
      const ss=storyState();story.draw(c,t,ss,'back');c.save();c.translate(490,240);if([0,13,15,25,26,31].includes(index))c.rotate(Math.sin(t*8)*.045);if(index===13)c.scale(1,1+Math.sin(t*9)*.05);c.translate(-490,-240);for(const p of parts)drawPart(c,p,p.colour,26);c.restore();story.draw(c,t,ss,'front');return;
    }
-   if(phase==='find'||phase==='done'){text(c,round===0?'Где наша буква?':'А теперь — ещё раз!',500,65,30,C.ink);box(c,73,105,100,92,22,'#fffaf2');glyph(c,l.letter,123,158,72,C.ink);for(let j=0;j<cards.length;j++){const card=cards[j],shake=0;box(c,card.x+shake,card.y,card.w,card.h,28,'#fffaf2',wrong===j&&wrongTime>0?'#e0b78e':'#d6cbb6');glyph(c,card.letter,card.x+card.w/2+shake,card.y+card.h*.56,160,C.ink)}drawTogetherGuide(c,t,wrongTime>0);for(let j=0;j<2;j++){circle(c,475+j*48,475,15,j<round?C.green:'#d8cfbd');if(j<round)text(c,'✓',475+j*48,475,20,'#fffaf0')}if(wrongTime>0)text(c,'Давай посмотрим вместе',500,527,20,'#8c7862');}
+   if(phase==='find'||phase==='done'){text(c,round===0?'Где наша буква?':'А теперь — ещё раз!',500,65,30,C.ink);box(c,73,105,100,92,22,'#fffaf2');glyph(c,l.letter,123,158,72,C.ink);for(let j=0;j<cards.length;j++){const card=cards[j],shake=0;box(c,card.x+shake,card.y,card.w,card.h,28,'#fffaf2',wrong===j&&wrongTime>0?'#e0b78e':'#d6cbb6');glyph(c,card.letter,card.x+card.w/2+shake,card.y+card.h*.56,160,round>1?['#b66343','#8064aa','#657f42','#517f89','#9d5f7b','#8c732d'][(round+j)%6]:C.ink)}if(options.companion)drawCompanion(c,index,t,{round:Math.floor(round/5),happy:findLock>0});else drawTogetherGuide(c,t,wrongTime>0);const spacing=Math.min(42,620/findGoal);for(let j=0;j<findGoal;j++){const x=500+(j-(findGoal-1)/2)*spacing;circle(c,x,475,findGoal>10?10:14,j<round?C.green:'#d8cfbd');if(j<round)text(c,'✓',x,475,findGoal>10?14:18,'#fffaf0')}if(wrongTime>0)text(c,'Давай посмотрим вместе',500,527,20,'#8c7862');}
  }
  function cancel(){active=false;previous=null;selected=null;if(drag?.position)drag.position=null;drag=null}
  return{down,move,up,cancel,draw,guide,replay(){if(phase==='reveal')reveal=0},state:()=>({phase,round,placed:[...done],progress:tracePoints.size?[...trace].map(([id,n])=>({id,n,total:tracePoints.get(id)?.length||0})):[],cards:cards.map(c=>({...c})),parts:parts.map(p=>({id:p.id,points:p.points.map(q=>q.slice())})),pieces:pieces.map(p=>({id:p.id,decoy:p.decoy,used:p.used,home:p.home,origin:p.origin,dy:p.dy})),mirrorReady,extension,erased})};

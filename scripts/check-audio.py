@@ -10,9 +10,10 @@ plan=json.loads((ROOT/'denis-narration-plan.json').read_text())
 manifest=json.loads((ROOT/'audio-manifest.json').read_text())
 comedy=json.loads((ROOT/'comedy-narration-plan.json').read_text())
 warmth=json.loads((ROOT/'warmth-narration-plan.json').read_text())
-expected={r['file']:r for r in plan['files']+comedy['files']+warmth['files']}
+practice=json.loads((ROOT/'practice-narration-plan.json').read_text())
+expected={r['file']:r for r in plan['files']+comedy['files']+warmth['files']+practice['files']}
 actual={r['file']:r for r in manifest['files']}
-assert len(actual)==manifest['count']==337 and actual.keys()==expected.keys()
+assert len(actual)==manifest['count']==346 and actual.keys()==expected.keys()
 assert manifest['provider']=='ElevenLabs' and manifest['voice_id']==plan['voice_id']=='0BcDz9UPwL3MpsnTeUlO'
 assert manifest.get('model',manifest.get('model_id'))=='eleven_v4'
 assert {p.name for p in (ROOT/'docs/audio').glob('*.m4a')}==expected.keys(),'Unexpected or missing published recordings'
@@ -33,4 +34,4 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:results=list(p
 duration=sum(r[0] for r in results);size=sum(r[1] for r in results)
 assert abs(duration-manifest['duration_seconds'])<.1
 assert size==manifest['bytes']
-print(f'Audio: 337 current Denis / ElevenLabs v4 clips decode, {duration/60:.1f} minutes, {size/1e6:.2f} MB.')
+print(f'Audio: {len(actual)} current Denis / ElevenLabs v4 clips decode, {duration/60:.1f} minutes, {size/1e6:.2f} MB.')

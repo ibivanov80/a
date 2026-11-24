@@ -10,7 +10,7 @@ export function rescuePoster(task) {
   return cinemaAsset(library + frameId(task) + '-start.jpg');
 }
 
-export function mountRescueScene(figure, task, {state = 'before', reducedMotion = false, onStart, onEnd} = {}) {
+export function mountRescueScene(figure, task, {state = 'before', prompt = task.prompt, reducedMotion = false, onStart, onEnd} = {}) {
   const before = state === 'before';
   const startFrame = rescuePoster(task);
   const finalFrame = cinemaAsset(library + frameId(task) + '-end.jpg');
@@ -18,7 +18,7 @@ export function mountRescueScene(figure, task, {state = 'before', reducedMotion 
   poster.className = 'rs-scene';
   poster.width = 720;
   poster.height = 404;
-  poster.alt = before ? task.prompt : task.outcome;
+  poster.alt = before ? prompt : task.outcome;
   poster.src = before ? startFrame : finalFrame;
   figure.replaceChildren(poster);
   if (before) return {replay() {}, destroy() {}};

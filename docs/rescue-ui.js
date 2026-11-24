@@ -1,7 +1,7 @@
 import {chapters, tasks} from './rescue-data.js';
 import {neighbours} from './rescue-options.js';
-import {rescueClip} from './rescue-voice.js';
-import {cinemaAsset, mountRescueScene, rescuePoster} from './rescue-scene.js';
+import {rescueClip, rescuePrompt} from './rescue-voice.js?v=denis-riddles-1';
+import {cinemaAsset, mountRescueScene, rescuePoster} from './rescue-scene.js?v=denis-riddles-1';
 import {createRescueFoley} from './rescue-foley.js';
 
 const storageKey = 'bukvobum-rescues-v1';
@@ -129,8 +129,16 @@ export function createRescue({root, onHome, audio = new Audio(), onRoute = () =>
     const settings = getSettings();
     return settings.muted || settings.voice === 0;
   }
+  function wordListenLabel() {
+    return task.mode === 'phrase' ? 'Послушать фразу' : 'Послушать слово';
+  }
   function speak(kind, {explicit = false, after} = {}) {
     stopSpeech();
+    const retry = root.querySelector('.rs-audio-retry');
+    if (retry) {
+      retry.classList.remove('rs-audio-retry');
+      status('');
+    }
     if (!task || soundOff() || document.hidden) {
       if (explicit && soundOff()) status('Включи звук вверху экрана.');
       return;
@@ -150,17 +158,23 @@ export function createRescue({root, onHome, audio = new Audio(), onRoute = () =>
       afterClip = null;
       next?.();
     }
+    function playbackFailed(error) {
+      if (playing !== attempt || currentClip !== kind || error?.name === 'AbortError') return;
+      if (kind === 'prompt' || kind === 'word') {
+        // The child can start a deep-linked riddle with a tap if iPad blocks autoplay.
+        afterClip = null;
+        const replay = root.querySelector(kind === 'prompt' ? '[data-rs="listen"]' : '[data-rs="word"]');
+        replay?.classList.add('rs-audio-retry');
+        status(error?.name === 'NotAllowedError' ? 'Нажми на динамик, чтобы послушать.'
+          : 'Не удалось загрузить запись. Нажми на динамик ещё раз.');
+      } else if (explicit) status('Нажми на динамик ещё раз.');
+      finishClip();
+    }
     audio.volume = Math.max(0, Math.min(1, getSettings().voice ?? .9));
     audio.src = cinemaAsset(url);
     audio.onended = finishClip;
-    audio.onerror = () => {
-      if (explicit && playing === attempt) status('Не удалось загрузить запись. Нажми ещё раз.');
-      finishClip();
-    };
-    audio.play().catch(error => {
-      if (error.name !== 'AbortError' && playing === attempt && explicit) status('Нажми на динамик ещё раз.');
-      finishClip();
-    });
+    audio.onerror = playbackFailed;
+    audio.play().catch(playbackFailed);
   }
   function spokenInstruction() {
     if (rescueClip(task, 'prompt')) return 'prompt';
@@ -186,7 +200,7 @@ export function createRescue({root, onHome, audio = new Audio(), onRoute = () =>
   function renderStage(state) {
     const frame = root.querySelector('.rs-frame');
     scene = mountRescueScene(frame, task, {
-      state, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      state, prompt: rescuePrompt(task), reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
       onStart() { if (view === 'win') foley.play(task); },
       onEnd() { foley.stop(); }
     });
@@ -267,15 +281,15 @@ export function createRescue({root, onHome, audio = new Audio(), onRoute = () =>
       task.mode === 'letters' ? 'Нажимай на буквы' :
       task.mode === 'phrase' ? 'Собери фразу' : 'Собери слово из слогов';
     const spoken = spokenInstruction();
-    const listenLabel = spoken === 'prompt' ? 'Послушать задание' :
+    const listenLabel = spoken === 'prompt' ? 'Послушать загадку' :
       spoken ? 'Повторить инструкцию' : 'Показать подсказку со звуком';
     const listenButton = spoken || rescueClip(task, 'hint') ?
       `<button class="rs-playvoice" data-rs="listen" aria-label="${listenLabel}" title="${listenLabel}">${speaker()}</button>` : '';
     root.innerHTML = `<main class="rs-page rs-game">${header('map','Все игры', 'Спасение ' + task.id + ' из ' + tasks.length)}
       <section class="rs-work">
-        <figure class="rs-frame" aria-label="${escape(task.prompt)}"></figure>
+        <figure class="rs-frame" aria-label="${escape(rescuePrompt(task))}"></figure>
         <div class="rs-puzzle"><div class="rs-question">
-          <h1 tabindex="-1" data-rs-heading>${escape(task.prompt)}</h1>
+          <h1 tabindex="-1" data-rs-heading>${escape(rescuePrompt(task))}</h1>
           ${spoken === 'prompt' ? listenButton : ''}
         </div>
         <div class="rs-instruction"><p class="rs-command" data-rs-prompt>${instruction}</p>${spoken === 'prompt' ? '' : listenButton}</div>
@@ -361,7 +375,7 @@ export function createRescue({root, onHome, audio = new Audio(), onRoute = () =>
     if (!voiced) onEffect('pop');
     if (chosen.length === task.pieces.length) return win(voiced ? pieceKind : null);
     if (voiced) speak(pieceKind);
-    else stopSpeech();
+    else if (currentClip !== 'prompt') stopSpeech();
     const from = button.getBoundingClientRect();
     updateBoard();
     const filled = root.querySelectorAll('.rs-slot.filled');
@@ -402,7 +416,7 @@ export function createRescue({root, onHome, audio = new Audio(), onRoute = () =>
     model.innerHTML = `<span>Прочитаем вместе</span><b>${mergedModel ? escape(task.target) : words}</b>
       ${sounds}
       <button data-rs="blend">${mergedModel ? 'Разложить на карточки' : 'Соединить и прочитать'}</button>
-      ${rescueClip(task,'word') ? `<button data-rs="word">${speaker()} Послушать слово</button>` : ''}`;
+      ${rescueClip(task,'word') ? `<button data-rs="word">${speaker()} ${wordListenLabel()}</button>` : ''}`;
     status(view === 'check' ? 'Найди это слово среди ответов.' : 'Следующая карточка — ' + task.pieces[chosen.length] + '.');
     if (readWhole && rescueClip(task,'word')) speak('word');
     else if (rescueClip(task,'hint')) speak('hint');
@@ -422,7 +436,7 @@ export function createRescue({root, onHome, audio = new Audio(), onRoute = () =>
         <figure class="rs-frame" aria-label="${escape(task.outcome)}"></figure>
         <div class="rs-puzzle"><div class="rs-question">
           <h1 class="rs-answer" tabindex="-1" data-rs-heading>${escape(task.target)}</h1>
-          ${rescueClip(task,'word') ? `<button class="rs-playvoice" data-rs="word" aria-label="Послушать слово">${speaker()}</button>` : ''}
+          ${rescueClip(task,'word') ? `<button class="rs-playvoice" data-rs="word" title="${wordListenLabel()}" aria-label="${wordListenLabel()}">${speaker()}</button>` : ''}
         </div>
         <p class="rs-outcome">${escape(task.outcome)}</p>
         <div class="rs-end-actions"><button class="rs-primary rs-next" data-rs="next">${next ? 'Дальше' : 'К играм'} ${icon('next')}</button>

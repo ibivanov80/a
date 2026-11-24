@@ -106,6 +106,7 @@
 .rs-question { display:flex; align-items:flex-start; gap:10px; }
 .rs-puzzle h1 { flex: 1; font-size: clamp(1.28rem,2.3vw,2rem); line-height: 1.2; margin: 0; letter-spacing: -.025em; }
 .rs-playvoice { flex: none; background: #dfedde; color: #1a593d; border-color: #a6c9ac; }
+.rs-audio-retry { outline: 3px solid #367850; outline-offset: 3px; }
 .rs-instruction { display: flex; align-items: center; gap: 10px; margin: 10px 0 8px; }
 .rs-command { font-size: clamp(1.06rem,1.55vw,1.3rem); font-weight: 850; color: #294d42; margin: 0; }
 .rs-first-model { font-size: clamp(1.85rem,3vw,2.55rem); letter-spacing:.12em; line-height:1.05; font-weight:950; margin: 0 0 7px 10px; color:#275d45; }

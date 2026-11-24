@@ -65,7 +65,7 @@ async function enterRescue(destination) {
   const request = rescueLoad;
   app.innerHTML = '<main class="shell" aria-live="polite"><p>Открываем слоговые спасения…</p></main>';
   try {
-    const {createRescue} = await import('./rescue-ui.js?v=storybook-2');
+    const {createRescue} = await import('./rescue-ui.js?v=denis-riddles-1');
     if (request !== rescueLoad) return;
     rescue = createRescue({
       root: app,

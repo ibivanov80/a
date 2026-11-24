@@ -1,4 +1,5 @@
 // The rescue game uses only the same prerecorded Russian narrator as the alphabet.
+import {recordedRescues} from './rescue-narration.js?v=denis-all-1';
 import {LEVELS} from './data.js?v=variety-v1';
 
 const words = new Map();
@@ -23,7 +24,14 @@ const shared = {
   next: 'next'
 };
 
+export function rescuePrompt(task) {
+  return recordedRescues[task.id]?.text ?? task.prompt;
+}
+
 export function rescueClip(task, kind) {
+  if ((kind === 'word' || kind === 'prompt') && recordedRescues[task?.id]?.[kind]) {
+    return recordedRescues[task.id][kind];
+  }
   if (task?.id === 1 && kind === 'piece:А') return 'assets/rescue-voice/vowel-a.m4a';
   if (task?.id === 1 && kind === 'piece:У') return 'assets/rescue-voice/vowel-u.m4a';
   if (kind === 'word') return words.get(task?.target) ?? null;

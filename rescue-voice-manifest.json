@@ -124,6 +124,14 @@
       "start": 5.845,
       "end": 6.15,
       "sha256": "5812a92f06fc305cbcd877bd458209d20a057edebdab32f1d3fd7e32eef2496e"
+    },
+    {
+      "file": "sam-reading.m4a",
+      "text": "Сам",
+      "source": "17-joke.m4a",
+      "start": 3.48,
+      "end": 3.821,
+      "sha256": "f0ce9de727a75f42de6d36001c908e16c8900411ab28f5956496bf276ded71c5"
     }
   ]
 }

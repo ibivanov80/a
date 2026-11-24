@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
-import {existsSync} from 'node:fs';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {chapters, tasks} from '../docs/rescue-data.js';
 import {neighbours} from '../docs/rescue-options.js';
+import {rescuePoster} from '../docs/rescue-scene.js';
 
-const mediaDir = new URL('../docs/assets/rescue/', import.meta.url);
+const publicRoot = new URL('../docs/', import.meta.url);
+const films = new Set();
 assert.equal(chapters.length, 10);
 assert.equal(tasks.length, 300);
 assert.equal(new Set(tasks.map(t => t.outcome)).size, tasks.length, 'Every mission needs a distinct payoff');
@@ -44,10 +47,20 @@ for (const [index, task] of tasks.entries()) {
     assert.equal(built, word, label + ' word boundaries');
   }
 }
-for (const scene of new Set(tasks.map(task => task.scene))) {
-  for (const suffix of ['.jpg', '-end.jpg', '.mp4']) {
-    assert(existsSync(new URL(scene + suffix, mediaDir)), 'Missing ' + scene + suffix);
+for (const task of tasks) {
+  const stem = 'assets/rescue-cinema/r' + String(task.id).padStart(3, '0');
+  assert.equal(rescuePoster(task), stem + '-start.jpg', 'Starting scene ' + task.id);
+  for (const suffix of ['-start.jpg', '-end.jpg']) {
+    const frame = readFileSync(new URL(stem + suffix, publicRoot));
+    assert.equal(frame.readUInt16BE(0), 0xffd8, 'Expected JPEG ' + stem + suffix);
+    assert.equal(frame.readUInt16BE(frame.length - 2), 0xffd9, 'Incomplete JPEG ' + stem + suffix);
   }
+  const film = readFileSync(new URL(stem + '.mp4', publicRoot));
+  assert.equal(film.toString('ascii', 4, 8), 'ftyp', 'Expected MP4 ' + stem);
+  assert(film.includes(Buffer.from('avc1')), 'Expected H.264 video ' + stem);
+  const digest = createHash('sha256').update(film).digest('hex');
+  assert(!films.has(digest), 'Repeated film ' + stem);
+  films.add(digest);
 }
 assert(tasks.some(t => t.target === 'ВОЛК' && t.scene === 'wolf' && t.pieces.join('/') === 'В/О/Л/К'));
 assert(tasks.some(t => t.target === 'ВОЛЧОНОК' && t.pieces.join('/') === 'ВОЛ/ЧО/НОК' && t.scene !== 'wolf'));

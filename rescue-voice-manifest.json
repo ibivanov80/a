@@ -1,0 +1,129 @@
+{
+  "provider": "ElevenLabs",
+  "voice": "Denis",
+  "model": "eleven_v4",
+  "sourceManifest": "audio-manifest.json",
+  "clips": [
+    {
+      "file": "read.m4a",
+      "text": "Прочитай его вслух.",
+      "source": "reading-intro.m4a",
+      "start": 2.97,
+      "end": 4.22,
+      "sha256": "517585b8ac046be1f850cff2af101b7ab6b8cfc2f1cad8e55c0b816acefb6beb"
+    },
+    {
+      "file": "together.m4a",
+      "text": "Ничего. Давай посмотрим вместе.",
+      "source": "try-together.m4a",
+      "start": 0,
+      "end": 2.54,
+      "sha256": "2a0d882bc27ca0d787f2d63c64cf598c4e39037e81bfa77706775dd04e37d253"
+    },
+    {
+      "file": "magic.m4a",
+      "text": "Вот это да! Слово ожило!",
+      "source": "reading-magic.m4a",
+      "start": 0.3,
+      "end": 3.0,
+      "sha256": "85df59c9b4ff24f1e6f104da7dde4d7f71734bb61fdcaa9281760c8b2733f589"
+    },
+    {
+      "file": "welcome.m4a",
+      "text": "Привет! Я Бум, а это Шмяк. Мы тебе рады!",
+      "source": "welcome.m4a",
+      "start": 0,
+      "end": 3.79,
+      "sha256": "e0bb5a9514827a4878d2f9d54a9160130d3ee8c8459a9e8fd40972b4a06343ab"
+    },
+    {
+      "file": "next.m4a",
+      "text": "Поехали?",
+      "source": "route-next.m4a",
+      "start": 4.05,
+      "end": 4.92,
+      "sha256": "b3df6a05309466a35367fcfc71c2525afc7192581ee39961b4ec6e6fec73c789"
+    },
+    {
+      "file": "again.m4a",
+      "text": "Давай ещё раз, спокойно.",
+      "source": "reading-retry.m4a",
+      "start": 1.77,
+      "end": 3.72,
+      "sha256": "a4a104227994ea31d8473a0898a24d811f0a6dd4484bba8835720167c62140c9"
+    },
+    {
+      "file": "hooray.m4a",
+      "text": "Ура! Ещё одно слово!",
+      "source": "reading-hooray.m4a",
+      "start": 0.15,
+      "end": 2.33,
+      "sha256": "b534848c90baf0dd53a36cca67809cbd0853676667ed7361d66beef8ccc6b66a"
+    },
+    {
+      "file": "assemble.m4a",
+      "text": "Собери слово.",
+      "segments": [
+        {
+          "source": "11-intro.m4a",
+          "start": 0,
+          "end": 0.575
+        },
+        {
+          "source": "reading-ready.m4a",
+          "start": 2.108,
+          "end": 2.76
+        }
+      ],
+      "sha256": "86e789ce3beb11c84c58bcc0c607986ba347b220b2cfc7a36809b6a33028a8e5"
+    },
+    {
+      "file": "papa.m4a",
+      "text": "Папа",
+      "source": "letter-friends.m4a",
+      "start": 0.713,
+      "end": 1.115,
+      "sha256": "63d0f4dffa9e4588b803100666bc3788ad9e99ee1a0b26f60821526dd44c360e"
+    },
+    {
+      "file": "sam.m4a",
+      "text": "Сам",
+      "source": "17-joke.m4a",
+      "start": 3.435,
+      "end": 3.821,
+      "sha256": "15649d957cdcc63d6e8703a65997eaecf62ac789cb829f5573fbb347d7da44f5"
+    },
+    {
+      "file": "kino.m4a",
+      "text": "Кино",
+      "source": "32-finish.m4a",
+      "start": 3.105,
+      "end": 3.776,
+      "sha256": "2be24b0b701ad9137ab2bf412ee527c40a542178dcc8212922b637710fff33a6"
+    },
+    {
+      "file": "taburetka.m4a",
+      "text": "Табуретка",
+      "source": "9-joke.m4a",
+      "start": 3.247,
+      "end": 3.907,
+      "sha256": "f007b1e46f25cbded626912b59364a80dc8b525bc8dff5629f00b7ebc72d5f7b"
+    },
+    {
+      "file": "vowel-a.m4a",
+      "text": "а",
+      "source": "0-finish.m4a",
+      "start": 1.635,
+      "end": 2.105,
+      "sha256": "9589e993cfa198da91a1b7380a0fa707e751ce9937240a7c8ed39d22113d5dc4"
+    },
+    {
+      "file": "vowel-u.m4a",
+      "text": "у",
+      "source": "20-find-hint.m4a",
+      "start": 5.845,
+      "end": 6.15,
+      "sha256": "5812a92f06fc305cbcd877bd458209d20a057edebdab32f1d3fd7e32eef2496e"
+    }
+  ]
+}

@@ -1,16 +1,15 @@
 import {chapters, tasks} from './rescue-data.js';
 import {neighbours} from './rescue-options.js';
-import {LEVELS} from './data.js?v=variety-v1';
+import {rescueClip} from './rescue-voice.js';
+import {cinemaAsset, mountRescueScene, rescuePoster} from './rescue-scene.js';
+import {createRescueFoley} from './rescue-foley.js';
 
 const storageKey = 'bukvobum-rescues-v1';
 const byId = new Map(tasks.map(task => [task.id, task]));
-const recordings = new Map();
-LEVELS.forEach((level, index) => level.words.forEach((word, position) => {
-  recordings.set(word.toLocaleUpperCase('ru'), index + '-word-' + position);
-}));
 const escape = value => String(value).replace(/[&<>"']/g, c =>
   ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'})[c]);
-const imagePath = (scene, suffix = '.jpg') => 'assets/rescue/' + encodeURIComponent(scene) + suffix;
+const icons = {back:'‹', map:'▦', undo:'↶', hint:'?', next:'▶', replay:'↻'};
+const icon = name => `<span class="rs-symbol" aria-hidden="true">${icons[name]}</span>`;
 
 function readProgress() {
   let value;
@@ -62,7 +61,8 @@ function ask(task) {
   return 'Соедини слоги в слово.';
 }
 
-export function createRescue({root, onHome, getSettings = () => ({}), onEffect = () => {}}) {
+export function createRescue({root, onHome, audio = new Audio(), onRoute = () => {},
+  getSettings = () => ({}), onToggleSound, onEffect = () => {}}) {
   let progress = readProgress();
   let memoryOnly = false;
   let opened = false;
@@ -73,10 +73,15 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
   let chosen = [];
   let assisted = false;
   let attempted = false;
+  let misses = 0;
   let mergedModel = false;
-  let clip = null;
-  let utterance = null;
-  let watched = false;
+  const foley = createRescueFoley(getSettings);
+  let scene = null;
+  let playing = 0;
+  let currentClip = null;
+  let afterClip = null;
+  let demo = false;
+  let pausedByBackground = false;
 
   function save() {
     const stored = readProgress();
@@ -99,20 +104,18 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
     }
   }
   function stopSpeech() {
-    if (clip) {
-      clip.onerror = null;
-      clip.pause();
-      clip = null;
-    }
-    if (utterance) {
-      utterance.onerror = null;
-      window.speechSynthesis?.cancel();
-      utterance = null;
-    }
+    playing++;
+    currentClip = null;
+    afterClip = null;
+    audio.pause();
+    audio.onended = null;
+    audio.onerror = null;
   }
-  function leaveScreen() {
-    stopSpeech();
-    root.querySelector('.rs-frame video')?.pause();
+  function leaveScreen(keepSpeech = false) {
+    if (!keepSpeech) stopSpeech();
+    foley.stop();
+    scene?.destroy();
+    scene = null;
   }
   function focusTitle() {
     root.querySelector('[data-rs-heading]')?.focus({preventScroll:true});
@@ -122,52 +125,77 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
     const el = root.querySelector('[data-rs-status]');
     if (el) el.textContent = text;
   }
-  function systemSpeech(text) {
+  function soundOff() {
     const settings = getSettings();
-    if (settings.muted || settings.voice === 0) {
-      status('Звук выключен в настройках игры.');
-      return;
-    }
-    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
-      status('В этом браузере голос недоступен. Можно прочитать вместе со взрослым.');
-      return;
-    }
+    return settings.muted || settings.voice === 0;
+  }
+  function speak(kind, {explicit = false, after} = {}) {
     stopSpeech();
-    const voice = new SpeechSynthesisUtterance(text);
-    voice.lang = 'ru-RU';
-    const russian = window.speechSynthesis.getVoices().find(v => /^ru\b/i.test(v.lang));
-    if (russian) voice.voice = russian;
-    voice.rate = 0.87;
-    voice.volume = Math.min(1, Math.max(0, settings.voice ?? 0.9));
-    utterance = voice;
-    voice.onerror = event => {
-      if (utterance === voice && event.error !== 'interrupted' && event.error !== 'canceled')
-        status('Голос недоступен. Прочитайте задание вместе.');
+    if (!task || soundOff() || document.hidden) {
+      if (explicit && soundOff()) status('Включи звук вверху экрана.');
+      return;
+    }
+    const url = rescueClip(task, kind);
+    if (!url) {
+      if (explicit) status('Прочитайте вместе со взрослым.');
+      return;
+    }
+    const attempt = playing;
+    currentClip = kind;
+    afterClip = after;
+    function finishClip() {
+      if (playing !== attempt || currentClip !== kind) return;
+      const next = afterClip;
+      currentClip = null;
+      afterClip = null;
+      next?.();
+    }
+    audio.volume = Math.max(0, Math.min(1, getSettings().voice ?? .9));
+    audio.src = cinemaAsset(url);
+    audio.onended = finishClip;
+    audio.onerror = () => {
+      if (explicit && playing === attempt) status('Не удалось загрузить запись. Нажми ещё раз.');
+      finishClip();
     };
-    window.speechSynthesis.speak(voice);
+    audio.play().catch(error => {
+      if (error.name !== 'AbortError' && playing === attempt && explicit) status('Нажми на динамик ещё раз.');
+      finishClip();
+    });
+  }
+  function spokenInstruction() {
+    if (rescueClip(task, 'prompt')) return 'prompt';
+    if (view === 'check') return 'check';
+    if (task.mode !== 'phrase' && rescueClip(task, 'assemble')) return 'assemble';
+    return null;
   }
   function listenWord() {
     if (view === 'task' || view === 'check') markAssisted();
-    const settings = getSettings();
-    const sound = recordings.get(task.target);
-    if (!sound) return systemSpeech(task.target.toLocaleLowerCase('ru'));
-    stopSpeech();
-    if (settings.muted || settings.voice === 0) return status('Звук выключен в настройках игры.');
-    const audio = new Audio('audio/' + sound + '.m4a');
-    audio.volume = Math.min(1, Math.max(0, settings.voice ?? 0.9));
-    clip = audio;
-    audio.play().catch(() => {
-      if (clip === audio) status('Запись не открылась. Прочитайте слово вместе.');
-    });
+    speak('word', {explicit: true});
+  }
+  function soundControl() {
+    if (!onToggleSound) return '';
+    const off = soundOff();
+    return `<button type="button" class="rs-sound" data-rs="mute" aria-label="${off ? 'Включить звук' : 'Выключить звук'}" aria-pressed="${!off}">${speaker(off)}<span>${off ? 'Без звука' : 'Звук'}</span></button>`;
+  }
+  function speaker(off = false) {
+    return `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9h4l5-4v14l-5-4H3z"/>${off ? '<path d="m16 9 5 6m0-6-5 6"/>' : '<path d="M16 8q4 4 0 8m3-11q7 7 0 14"/>'}</svg>`;
   }
   function header(backAction, backText, rightText) {
-    return `<header class="rs-top"><button type="button" class="rs-back" data-rs="${backAction}"><span aria-hidden="true">‹</span>${backText}</button><strong>${escape(rightText)}</strong></header>`;
+    return `<header class="rs-top"><button type="button" class="rs-back" data-rs="${backAction}">${icon(backAction === 'map' ? 'map' : 'back')}${backText}</button><strong>${escape(rightText)}</strong>${soundControl()}</header>`;
   }
-
+  function renderStage(state) {
+    const frame = root.querySelector('.rs-frame');
+    scene = mountRescueScene(frame, task, {
+      state, reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+      onStart() { if (view === 'win') foley.play(task); },
+      onEnd() { foley.stop(); }
+    });
+  }
   function renderMap() {
     leaveScreen();
     view = 'map';
     task = null;
+    onRoute('map');
     const next = byId.get(progress.last) || tasks[0];
     const began = progress.done.size > 0 || next.id !== tasks[0].id;
     const cards = chapters.map(item => {
@@ -175,7 +203,7 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
       const count = deck.filter(t => progress.done.has(t.id)).length;
       const preview = deck[(item.id - 1) % deck.length];
       return `<button class="rs-chapter" data-rs="chapter" data-id="${item.id}">
-        <img src="${imagePath(preview.scene)}" alt="" loading="lazy" width="160" height="90">
+        <img src="${rescuePoster(preview)}" alt="" loading="lazy" width="160" height="90">
         <span><small>Шаг ${item.id} · ${count} из ${deck.length}</small><b>${escape(item.title)}</b><span>${escape(item.skill)}</span></span>
       </button>`;
     }).join('');
@@ -185,7 +213,7 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
       <h1 tabindex="-1" data-rs-heading>Слоговые спасения</h1>
       <p>Собирай слова и помогай героям приключений.</p>
       <button class="rs-primary" data-rs="start" data-id="${next.id}">${began ? 'Продолжить игру' : 'Начать спасение'}</button></div>
-      <img src="${imagePath('cover')}" alt="Волк ждёт помощи в ледяной ловушке." width="640" height="360"></section>
+      <img src="${cinemaAsset('assets/rescue/cover-3d.jpg')}" alt="Волк ждёт помощи в ледяной ловушке." width="640" height="360"></section>
       <h2 class="rs-subtitle">Выбери шаг</h2><section class="rs-chapters" aria-label="Шаги программы">${cards}</section>
       ${memoryOnly ? '<p>Браузер сохраняет результат только до закрытия страницы.</p>' : ''}</main>`;
     focusTitle();
@@ -193,11 +221,12 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
 
   function showChapter(id) {
     const match = chapters.find(item => item.id === id);
-    if (!match) return;
+    if (!match) return renderMap();
     leaveScreen();
     chapter = match;
     task = null;
     view = 'chapter';
+    onRoute('chapter/' + id);
     const deck = tasks.filter(item => item.chapter === id);
     const done = deck.filter(item => progress.done.has(item.id)).length;
     const next = deck.find(item => !progress.done.has(item.id)) || deck[0];
@@ -216,7 +245,7 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
     focusTitle();
   }
 
-  function begin(id) {
+  function begin(id, firstOfSession = false) {
     const match = byId.get(id);
     if (!match) return renderMap();
     leaveScreen();
@@ -225,31 +254,48 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
     chosen = [];
     bank = shuffled([...task.pieces, ...task.distractors]);
     assisted = progress.assisted.has(task.id);
-    watched = false;
+    demo = task.id === tasks[0].id && !progress.done.has(task.id);
     attempted = false;
+    misses = 0;
     mergedModel = false;
     progress.last = id;
+    onRoute(String(id));
     save();
     view = task.transfer ? 'check' : 'task';
-    const deck = tasks.filter(item => item.chapter === task.chapter);
     document.title = chapter.title + ' · Слоговые спасения';
-    root.innerHTML = `<main class="rs-page rs-game">${header('currentChapter','К заданиям', 'Шаг ' + chapter.id + ' · ' + (deck.indexOf(task) + 1) + ' из ' + deck.length)}
+    const instruction = view === 'check' ? 'Выбери ответ' :
+      task.mode === 'letters' ? 'Нажимай на буквы' :
+      task.mode === 'phrase' ? 'Собери фразу' : 'Собери слово из слогов';
+    const spoken = spokenInstruction();
+    const listenLabel = spoken === 'prompt' ? 'Послушать задание' :
+      spoken ? 'Повторить инструкцию' : 'Показать подсказку со звуком';
+    const listenButton = spoken || rescueClip(task, 'hint') ?
+      `<button class="rs-playvoice" data-rs="listen" aria-label="${listenLabel}" title="${listenLabel}">${speaker()}</button>` : '';
+    root.innerHTML = `<main class="rs-page rs-game">${header('map','Все игры', 'Спасение ' + task.id + ' из ' + tasks.length)}
       <section class="rs-work">
-        <figure class="rs-frame"><img class="rs-scene" src="${imagePath(task.scene)}" alt="${escape(task.prompt)}" width="640" height="360"></figure>
-        <div class="rs-puzzle"><h1 tabindex="-1" data-rs-heading>${escape(task.prompt)}</h1>
-          <div class="rs-instruction"><p data-rs-prompt>${view === 'check' ? 'Прочитай и выбери ответ.' : ask(task)}</p><button class="rs-listen" data-rs="listen" aria-label="Послушать задание системным голосом">Послушать · голос устройства</button></div>
-          ${task.chapter === 1 ? '<details class="rs-demo"><summary>Как соединить звуки?</summary><p>Потяни звук «м-м-м» и сразу добавь «у». Веди пальцем слева направо и скажи слитно.</p><b>м-м-му → му</b><p>Теперь попробуй сам.</p></details>' : ''}
-          ${task.transfer ? `<div class="rs-check" role="group" aria-label="Выбери подходящий ответ">${checkOptions(task).map(word =>
-            `<button class="rs-choice" data-rs="check-word" data-word="${escape(word)}">${escape(word)}</button>`).join('')}</div>` : ''}
-          <div class="rs-assembly" ${view === 'check' ? 'hidden' : ''}><div class="rs-slots" aria-label="Собранное слово"></div>
+        <figure class="rs-frame" aria-label="${escape(task.prompt)}"></figure>
+        <div class="rs-puzzle"><div class="rs-question">
+          <h1 tabindex="-1" data-rs-heading>${escape(task.prompt)}</h1>
+          ${spoken === 'prompt' ? listenButton : ''}
+        </div>
+        <div class="rs-instruction"><p class="rs-command" data-rs-prompt>${instruction}</p>${spoken === 'prompt' ? '' : listenButton}</div>
+        ${task.transfer ? `<div class="rs-check" role="group" aria-label="Варианты ответа">${checkOptions(task).map(word =>
+          `<button class="rs-choice" data-rs="check-word" data-word="${escape(word)}">${escape(word)}</button>`).join('')}</div>` : ''}
+        <div class="rs-assembly" ${view === 'check' ? 'hidden' : ''}>
+          ${task.id <= 5 ? `<div class="rs-first-model" aria-label="Образец слова">${escape(task.target)}</div>` : ''}
+          <div class="rs-slots" aria-label="Собранное слово"></div>
           <div class="rs-bank" role="group" aria-label="Карточки">${bank.map((piece,i) =>
             `<button class="rs-tile" data-rs="tile" data-index="${i}">${escape(piece)}</button>`).join('')}</div>
-          </div><div class="rs-tools"><button data-rs="undo" ${view === 'check' ? 'hidden' : ''} disabled>Отменить ход</button><button data-rs="hint">Подсказка</button></div>
-          <div class="rs-model" hidden></div><p class="rs-feedback" role="status" aria-live="polite" data-rs-status></p>
+        </div>
+        <div class="rs-tools"><button data-rs="hint">${icon('hint')} Помоги</button><button data-rs="undo" hidden disabled>${icon('undo')} Назад</button></div>
+        <div class="rs-model" hidden></div><p class="rs-feedback" role="status" aria-live="polite" data-rs-status></p>
         </div>
       </section></main>`;
+    renderStage('before');
     updateBoard();
     focusTitle();
+    if (spoken) speak(spoken);
+    else if (firstOfSession) speak('next');
   }
   function updateBoard() {
     const slots = root.querySelector('.rs-slots');
@@ -261,8 +307,11 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
     root.querySelectorAll('[data-rs="tile"]').forEach((button, i) => {
       button.disabled = chosen.includes(i);
       button.classList.remove('rs-again');
+      button.classList.toggle('rs-guided', demo && !button.disabled && bank[i] === task.pieces[chosen.length]);
     });
-    root.querySelector('[data-rs="undo"]').disabled = chosen.length === 0;
+    const undo = root.querySelector('[data-rs="undo"]');
+    undo.disabled = chosen.length === 0;
+    undo.hidden = chosen.length === 0;
   }
   function checkWord(button, keyboardClick) {
     if (view !== 'check') return;
@@ -271,14 +320,20 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
       markAssisted();
       status('Прочитай до конца и выбери слово, которое подходит к загадке.');
       button.classList.add('rs-again');
+      speak('wrong');
       return;
     }
     stopSpeech();
     view = 'task';
     root.querySelector('.rs-check').hidden = true;
     root.querySelector('.rs-assembly').hidden = false;
-    root.querySelector('[data-rs="undo"]').hidden = false;
     root.querySelector('[data-rs-prompt]').textContent = ask(task);
+    if (task.mode !== 'phrase' && rescueClip(task, 'assemble')) speak('assemble');
+    const listen = root.querySelector('[data-rs="listen"]');
+    if (listen && !rescueClip(task, 'prompt')) {
+      listen.title = spokenInstruction() ? 'Повторить инструкцию' : 'Показать подсказку со звуком';
+      listen.setAttribute('aria-label', listen.title);
+    }
     status('Верно! Теперь собери прочитанное.');
     onEffect('pop');
     if (keyboardClick) root.querySelector('[data-rs="tile"]')?.focus();
@@ -289,15 +344,35 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
     const button = root.querySelector(`[data-rs="tile"][data-index="${index}"]`);
     if (bank[index] !== task.pieces[chosen.length]) {
       markAssisted();
-      status('Попробуй другую карточку. Собранная часть осталась на месте.');
+      misses++;
+      if (misses >= 2 && !task.transfer) {
+        demo = true;
+        updateBoard();
+      }
+      status(demo ? 'Попробуй карточку под ладошкой.' : 'Попробуй другую карточку.');
       button.classList.add('rs-again');
+      speak('wrong');
       return;
     }
-    stopSpeech();
+    const pieceKind = 'piece:' + bank[index];
+    const voiced = task.id === 1 && Boolean(rescueClip(task, pieceKind));
     chosen.push(index);
-    onEffect('pop');
-    if (chosen.length === task.pieces.length) return win();
+    misses = 0;
+    if (!voiced) onEffect('pop');
+    if (chosen.length === task.pieces.length) return win(voiced ? pieceKind : null);
+    if (voiced) speak(pieceKind);
+    else stopSpeech();
+    const from = button.getBoundingClientRect();
     updateBoard();
+    const filled = root.querySelectorAll('.rs-slot.filled');
+    const slot = filled[filled.length - 1];
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches && slot.animate) {
+      const to = slot.getBoundingClientRect();
+      slot.animate([
+        {transform: `translate(${from.x - to.x}px, ${from.y - to.y}px)`, background: '#ffdf8c'},
+        {transform: 'translate(0,0)', background: '#c5dfbd'}
+      ], {duration: 240, easing: 'ease-out'});
+    }
     const assembled = pieceGroups(task)
       .map(group => group.filter(i => i < chosen.length).map(i => bank[chosen[i]]).join(''))
       .filter(Boolean).join(' ');
@@ -307,6 +382,7 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
   function hint() {
     if (task.transfer && !attempted) {
       status('Попробуй выбрать ответ. Или открой образец, чтобы прочитать вместе.');
+      speak('hint', {explicit:true});
       const model = root.querySelector('.rs-model');
       model.hidden = false;
       model.innerHTML = '<button data-rs="show-model">Открыть образец</button>';
@@ -314,94 +390,78 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
     }
     renderModel();
   }
-  function renderModel() {
+  function renderModel(readWhole = false) {
     markAssisted();
     const model = root.querySelector('.rs-model');
     model.hidden = false;
     const words = pieceGroups(task).map(group => group.map(i => escape(task.pieces[i])).join(' · ')).join('　');
-    const voiceLabel = recordings.has(task.target) ? 'Послушать слово' : 'Послушать · голос устройства';
+    demo = view === 'task';
+    updateBoard();
+    const sounds = task.id === 1 && !mergedModel ? task.pieces.filter(piece => rescueClip(task, 'piece:' + piece))
+      .map(piece => `<button data-rs="piece" data-piece="${escape(piece)}" aria-label="Послушать звук ${escape(piece)}">${speaker()} ${escape(piece)}</button>`).join('') : '';
     model.innerHTML = `<span>Прочитаем вместе</span><b>${mergedModel ? escape(task.target) : words}</b>
+      ${sounds}
       <button data-rs="blend">${mergedModel ? 'Разложить на карточки' : 'Соединить и прочитать'}</button>
-      <button data-rs="word">${voiceLabel}</button>`;
+      ${rescueClip(task,'word') ? `<button data-rs="word">${speaker()} Послушать слово</button>` : ''}`;
     status(view === 'check' ? 'Найди это слово среди ответов.' : 'Следующая карточка — ' + task.pieces[chosen.length] + '.');
+    if (readWhole && rescueClip(task,'word')) speak('word');
+    else if (rescueClip(task,'hint')) speak('hint');
   }
-  function win() {
+  function win(lastPiece) {
+    const finishingFirstPiece = lastPiece && currentClip === 'piece:' + task.pieces[0];
     view = 'win';
     if (task.transfer && !assisted && !progress.done.has(task.id)) progress.independent.add(task.id);
     progress.done.add(task.id);
     const next = tasks[tasks.indexOf(task) + 1];
     progress.last = next?.id || tasks.find(item => !progress.done.has(item.id))?.id || task.id;
     save();
-    stopSpeech();
-    onEffect('gentle');
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const label = !next ? 'К карте спасений' : next.chapter !== task.chapter ? 'К следующему шагу' : 'Ещё спасение';
-    root.innerHTML = `<main class="rs-page rs-game">${header('currentChapter','К заданиям','Слово собрано')}
-      <section class="rs-work rs-win"><figure class="rs-frame">
-        <img class="rs-scene" src="${imagePath(task.scene,'-end.jpg')}" alt="${escape(task.outcome)}" width="640" height="360">
-        <video playsinline muted preload="none" poster="${imagePath(task.scene)}" aria-label="${escape(task.outcome)}" hidden></video>
-        <span class="rescue-prop rs-still-prop" data-trick="${escape(task.trick)}" aria-hidden="true">${escape(task.prop)}</span>
-      </figure><div class="rs-puzzle"><h1 class="rs-answer" tabindex="-1" data-rs-heading>${escape(task.target)}</h1>
+    leaveScreen(finishingFirstPiece);
+    const replayLabel = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'Смотреть' : 'Ещё раз';
+    root.innerHTML = `<main class="rs-page rs-game">${header('map','Все игры','Спасение ' + task.id + ' из ' + tasks.length)}
+      <section class="rs-work rs-win">
+        <figure class="rs-frame" aria-label="${escape(task.outcome)}"></figure>
+        <div class="rs-puzzle"><div class="rs-question">
+          <h1 class="rs-answer" tabindex="-1" data-rs-heading>${escape(task.target)}</h1>
+          ${rescueClip(task,'word') ? `<button class="rs-playvoice" data-rs="word" aria-label="Послушать слово">${speaker()}</button>` : ''}
+        </div>
         <p class="rs-outcome">${escape(task.outcome)}</p>
-        <div class="rs-end-actions"><button class="rs-primary" data-rs="next">${label}</button>
-        <button class="rs-quiet" data-rs="replay">${reduceMotion ? 'Смотреть спасение' : 'Смотреть ещё раз'}</button></div>
-        <button class="rs-listen" data-rs="word">${recordings.has(task.target) ? 'Послушать слово' : 'Послушать слово · голос устройства'}</button>
+        <div class="rs-end-actions"><button class="rs-primary rs-next" data-rs="next">${next ? 'Дальше' : 'К играм'} ${icon('next')}</button>
+        <button class="rs-quiet" data-rs="replay">${icon('replay')} ${replayLabel}</button></div>
         <p class="rs-feedback" role="status" data-rs-status></p>
-      </div></section></main>`;
+        </div>
+      </section></main>`;
+    renderStage('reward');
     focusTitle();
-    if (!reduceMotion) playMovie();
+    if (!lastPiece) playEnding();
+    else if (finishingFirstPiece) afterClip = () => speak(lastPiece, {after: playEnding});
+    else speak(lastPiece, {after: playEnding});
   }
-  function playMovie() {
-    if (view !== 'win') return;
-    const frame = root.querySelector('.rs-frame');
-    const video = frame.querySelector('video');
-    const replay = root.querySelector('[data-rs="replay"]');
-    // Keep the final still available on devices which block playback.
-    const restore = () => {
-      if (!video.isConnected) return;
-      video.hidden = true;
-      const prop = frame.querySelector('.rescue-prop');
-      if (prop) {
-        prop.hidden = false;
-        prop.classList.add('rs-still-prop');
-      }
-      replay.textContent = 'Смотреть ещё раз';
-    };
-    if (!watched) video.src = imagePath(task.scene,'.mp4');
-    watched = true;
-    video.pause();
-    video.currentTime = 0;
-    video.muted = true;
-    video.hidden = false;
-    video.onended = restore;
-    video.onerror = () => {
-      restore();
-      status('Видео не открылось. Спасение показано на картинке.');
-    };
-    frame.querySelector('.rescue-prop')?.remove();
-    const prop = document.createElement('span');
-    prop.className = 'rescue-prop';
-    prop.hidden = true;
-    video.onplaying = () => { prop.hidden = false; };
-    prop.dataset.trick = task.trick;
-    prop.textContent = task.prop;
-    prop.setAttribute('aria-hidden','true');
-    frame.append(prop);
-    video.play().catch(error => {
-      if (error.name === 'AbortError') return;
-      restore();
-      if (video.isConnected) status('Нажми «Смотреть ещё раз», чтобы запустить видео.');
-    });
+  function playEnding() {
+    const outcome = rescueClip(task,'outcome');
+    if (rescueClip(task,'word')) speak('word', {after: outcome ? () => speak('outcome') : undefined});
+    else if (outcome) speak('outcome');
+  }
+  function visibility() {
+    if (document.hidden) {
+      stopSpeech();
+      foley.stop();
+      root.querySelector('video')?.pause();
+      pausedByBackground = true;
+    } else if (pausedByBackground) {
+      pausedByBackground = false;
+      if (view === 'win') status('Можно посмотреть спасение ещё раз.');
+    }
   }
   function onClick(event) {
     const el = event.target.closest('button[data-rs]');
     if (!opened || !el || !root.contains(el) || el.disabled) return;
+    if (event.isTrusted) foley.arm();
     switch (el.dataset.rs) {
       case 'home': destroy(); onHome(); break;
       case 'map': renderMap(); break;
       case 'chapter': showChapter(Number(el.dataset.id)); break;
       case 'currentChapter': showChapter(task.chapter); break;
-      case 'start': begin(Number(el.dataset.id)); break;
+      case 'start': begin(Number(el.dataset.id), true); break;
       case 'check-word': checkWord(el, event.detail === 0); break;
       case 'tile': pick(Number(el.dataset.index), event.detail === 0); break;
       case 'undo':
@@ -411,16 +471,27 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
         status('Последняя карточка вернулась.');
         break;
       case 'hint': hint(); break;
-      case 'listen': systemSpeech(task.prompt + ' ' + (view === 'check' ? 'Прочитай и выбери ответ.' : ask(task))); break;
+      case 'listen':
+        if (spokenInstruction()) speak(spokenInstruction(), {explicit:true});
+        else hint();
+        break;
+      case 'mute': {
+        onToggleSound?.();
+        el.outerHTML = soundControl();
+        if (soundOff()) { stopSpeech(); foley.stop(); }
+        else if (view === 'win') playEnding();
+        else if (task) speak(spokenInstruction() || 'next');
+        break;
+      }
       case 'show-model': renderModel(); break;
-      case 'blend': mergedModel = !mergedModel; renderModel(); break;
+      case 'piece': speak('piece:' + el.dataset.piece, {explicit:true}); break;
+      case 'blend': mergedModel = !mergedModel; renderModel(mergedModel); break;
       case 'word': listenWord(); break;
-      case 'replay': playMovie(); break;
+      case 'replay': foley.stop(); scene?.replay(); playEnding(); break;
       case 'next': {
         if (view !== 'win') break;
         const next = tasks[tasks.indexOf(task) + 1];
         if (!next) renderMap();
-        else if (next.chapter !== task.chapter) showChapter(next.chapter);
         else begin(next.id);
         break;
       }
@@ -430,14 +501,17 @@ export function createRescue({root, onHome, getSettings = () => ({}), onEffect =
     if (!opened) return;
     leaveScreen();
     root.removeEventListener('click', onClick);
+    document.removeEventListener('visibilitychange', visibility);
     opened = false;
   }
   function open(id) {
     destroy();
     opened = true;
     root.addEventListener('click', onClick);
-    if (byId.has(Number(id))) begin(Number(id));
-    else renderMap();
+    document.addEventListener('visibilitychange', visibility);
+    if (id === 'map') renderMap();
+    else if (typeof id === 'string' && id.startsWith('chapter/')) showChapter(Number(id.slice(8)) || 1);
+    else begin(byId.has(Number(id)) ? Number(id) : progress.last, true);
   }
   return {open, destroy};
 }
